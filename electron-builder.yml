@@ -1,0 +1,17 @@
+appId: com.mdreader.app
+productName: MD Reader
+directories:
+  buildResources: build
+files:
+  - out/**/*
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
