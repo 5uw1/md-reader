@@ -3,15 +3,17 @@ import { AppProvider, useAppState } from './state/AppContext'
 import { ThemeProvider } from './state/ThemeContext'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useSplitScrollSync } from './hooks/useSplitScrollSync'
+import { useActiveHeading } from './hooks/useActiveHeading'
 import DropZone from './components/DropZone'
 import FileTree from './components/Sidebar/FileTree'
 import Toolbar from './components/Toolbar'
 import TocPanel from './components/TocPanel'
+import SearchBar from './components/SearchBar'
 import MarkdownViewer from './components/Viewer/MarkdownViewer'
 import EditorPane from './components/Viewer/EditorPane'
 
 function Shell(): React.JSX.Element {
-  const { mode, openResult, viewMode, showToc } = useAppState()
+  const { mode, openResult, viewMode, showToc, showSearch, headings, setActiveHeadingId } = useAppState()
   const { isDraggingOver } = useFileDrop()
   // State (not plain refs) so the scroll-sync effect re-attaches if either
   // node is ever replaced, e.g. EditorPane remounting.
@@ -25,6 +27,7 @@ function Shell(): React.JSX.Element {
   }, [openResult])
 
   useSplitScrollSync(previewEl, editorEl, viewMode === 'split')
+  useActiveHeading(previewEl, headings, viewMode !== 'edit', setActiveHeadingId)
 
   return (
     <div className="app">
@@ -39,6 +42,7 @@ function Shell(): React.JSX.Element {
           )}
           <main className="app__main">
             <Toolbar />
+            {showSearch && <SearchBar />}
             {/* Both panes stay mounted regardless of viewMode — CSS toggles visibility.
                 This keeps Export as PDF working even while in edit-only mode, since
                 print styles always force the preview pane visible. */}

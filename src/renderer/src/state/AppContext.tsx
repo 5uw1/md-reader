@@ -26,6 +26,12 @@ interface AppState {
   viewMode: ViewMode
   headings: HeadingInfo[]
   showToc: boolean
+  /** Heading currently at/near the top of the preview viewport, for TOC scrollspy. */
+  activeHeadingId?: string
+  showSearch: boolean
+  searchQuery: string
+  searchMatchCount: number
+  currentMatchIndex: number
   loading: boolean
   error?: string
 }
@@ -41,6 +47,12 @@ type Action =
   | { type: 'SET_VIEW_MODE'; mode: ViewMode }
   | { type: 'SET_HEADINGS'; headings: HeadingInfo[] }
   | { type: 'SET_SHOW_TOC'; show: boolean }
+  | { type: 'SET_ACTIVE_HEADING'; id: string | undefined }
+  | { type: 'SET_SHOW_SEARCH'; show: boolean }
+  | { type: 'SET_SEARCH_QUERY'; query: string }
+  | { type: 'SET_SEARCH_MATCH_COUNT'; count: number }
+  | { type: 'NEXT_MATCH' }
+  | { type: 'PREV_MATCH' }
   | { type: 'SAVE_START' }
   | { type: 'SAVE_SUCCESS' }
   | { type: 'SAVE_ERROR'; message: string }
@@ -52,7 +64,11 @@ function makeInitialState(): AppState {
     loading: false,
     viewMode: getStoredViewMode(),
     headings: [],
-    showToc: getStoredShowToc()
+    showToc: getStoredShowToc(),
+    showSearch: false,
+    searchQuery: '',
+    searchMatchCount: 0,
+    currentMatchIndex: 0
   }
 }
 
@@ -70,12 +86,25 @@ function reducer(state: AppState, action: Action): AppState {
         currentFilePath: undefined,
         currentContent: undefined,
         savedContent: undefined,
-        headings: []
+        headings: [],
+        showSearch: false,
+        searchQuery: '',
+        searchMatchCount: 0,
+        currentMatchIndex: 0
       }
     case 'OPEN_ERROR':
       return { ...state, loading: false, error: action.message }
     case 'SELECT_FILE_START':
-      return { ...state, loading: true, error: undefined, headings: [] }
+      return {
+        ...state,
+        loading: true,
+        error: undefined,
+        headings: [],
+        showSearch: false,
+        searchQuery: '',
+        searchMatchCount: 0,
+        currentMatchIndex: 0
+      }
     case 'SELECT_FILE_SUCCESS':
       return {
         ...state,
@@ -94,6 +123,34 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, headings: action.headings }
     case 'SET_SHOW_TOC':
       return { ...state, showToc: action.show }
+    case 'SET_ACTIVE_HEADING':
+      return { ...state, activeHeadingId: action.id }
+    case 'SET_SHOW_SEARCH':
+      return action.show
+        ? { ...state, showSearch: true }
+        : { ...state, showSearch: false, searchQuery: '', searchMatchCount: 0, currentMatchIndex: 0 }
+    case 'SET_SEARCH_QUERY':
+      return { ...state, searchQuery: action.query, currentMatchIndex: 0 }
+    case 'SET_SEARCH_MATCH_COUNT':
+      return {
+        ...state,
+        searchMatchCount: action.count,
+        currentMatchIndex: action.count === 0 ? 0 : Math.min(state.currentMatchIndex, action.count - 1)
+      }
+    case 'NEXT_MATCH':
+      return {
+        ...state,
+        currentMatchIndex:
+          state.searchMatchCount === 0 ? 0 : (state.currentMatchIndex + 1) % state.searchMatchCount
+      }
+    case 'PREV_MATCH':
+      return {
+        ...state,
+        currentMatchIndex:
+          state.searchMatchCount === 0
+            ? 0
+            : (state.currentMatchIndex - 1 + state.searchMatchCount) % state.searchMatchCount
+      }
     case 'SAVE_START':
       return { ...state, error: undefined }
     case 'SAVE_SUCCESS':
@@ -116,6 +173,12 @@ interface AppContextValue extends AppState {
   setViewMode: (mode: ViewMode) => void
   setHeadings: (headings: HeadingInfo[]) => void
   setShowToc: (show: boolean) => void
+  setActiveHeadingId: (id: string | undefined) => void
+  setShowSearch: (show: boolean) => void
+  setSearchQuery: (query: string) => void
+  setSearchMatchCount: (count: number) => void
+  goToNextMatch: () => void
+  goToPreviousMatch: () => void
   saveCurrentFile: () => Promise<void>
   reset: () => void
 }
@@ -198,6 +261,24 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     localStorage.setItem(SHOW_TOC_STORAGE_KEY, String(show))
   }, [])
 
+  const setActiveHeadingId = useCallback(
+    (id: string | undefined) => dispatch({ type: 'SET_ACTIVE_HEADING', id }),
+    []
+  )
+
+  const setShowSearch = useCallback((show: boolean) => dispatch({ type: 'SET_SHOW_SEARCH', show }), [])
+
+  const setSearchQuery = useCallback((query: string) => dispatch({ type: 'SET_SEARCH_QUERY', query }), [])
+
+  const setSearchMatchCount = useCallback(
+    (count: number) => dispatch({ type: 'SET_SEARCH_MATCH_COUNT', count }),
+    []
+  )
+
+  const goToNextMatch = useCallback(() => dispatch({ type: 'NEXT_MATCH' }), [])
+
+  const goToPreviousMatch = useCallback(() => dispatch({ type: 'PREV_MATCH' }), [])
+
   const saveCurrentFile = useCallback(async () => {
     const s = stateRef.current
     if (!s.currentFilePath || s.currentContent === undefined) return
@@ -257,6 +338,17 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [])
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        dispatch({ type: 'SET_SHOW_SEARCH', show: true })
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
@@ -268,6 +360,12 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       setViewMode,
       setHeadings,
       setShowToc,
+      setActiveHeadingId,
+      setShowSearch,
+      setSearchQuery,
+      setSearchMatchCount,
+      goToNextMatch,
+      goToPreviousMatch,
       saveCurrentFile,
       reset
     }),
@@ -281,6 +379,12 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       setViewMode,
       setHeadings,
       setShowToc,
+      setActiveHeadingId,
+      setShowSearch,
+      setSearchQuery,
+      setSearchMatchCount,
+      goToNextMatch,
+      goToPreviousMatch,
       saveCurrentFile,
       reset
     ]

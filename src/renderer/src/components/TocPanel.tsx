@@ -2,7 +2,7 @@ import React from 'react'
 import { useAppState } from '../state/AppContext'
 
 export default function TocPanel(): React.JSX.Element | null {
-  const { headings } = useAppState()
+  const { headings, activeHeadingId } = useAppState()
 
   if (headings.length === 0) return null
 
@@ -19,7 +19,8 @@ export default function TocPanel(): React.JSX.Element | null {
         {headings.map((h) => (
           <button
             key={h.id}
-            className="toc__item"
+            className={`toc__item${h.id === activeHeadingId ? ' toc__item--active' : ''}`}
+            aria-current={h.id === activeHeadingId ? 'location' : undefined}
             style={{ paddingLeft: 12 + (h.level - minLevel) * 14 }}
             onClick={() => handleClick(h.id)}
             title={h.text}

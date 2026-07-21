@@ -102,6 +102,15 @@
   color-scheme: dark;
 }
 
+/* Search-match highlight colors are opaque overlays (own bg + text color), so
+   they read fine regardless of light/dark theme — no per-theme override needed. */
+:root {
+  --search-match-bg: #ffe066;
+  --search-match-text: #1f2328;
+  --search-current-bg: #ff9f1c;
+  --search-current-text: #1f2328;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -161,6 +170,7 @@ body {
   text-align: left;
   padding: 6px 16px;
   border: none;
+  border-left: 2px solid transparent;
   background: none;
   color: var(--text-muted);
   font-size: 13px;
@@ -174,6 +184,13 @@ body {
 .toc__item:hover {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+.toc__item--active {
+  color: var(--accent);
+  font-weight: 600;
+  border-left-color: var(--accent);
+  background: var(--bg-active);
 }
 
 .app__main {
@@ -213,31 +230,44 @@ body {
   flex-shrink: 0;
 }
 
+/* Segmented Preview/Edit/Split control — buttons visually joined into one group. */
+.toolbar__spacer {
+  flex: 1;
+}
+
 .toolbar__modes {
   display: flex;
-  gap: 4px;
-  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .toolbar__mode-btn {
-  padding: 5px 12px;
-  font-size: 13px;
-  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-right: 1px solid var(--border);
   background: var(--bg);
   color: var(--text-muted);
-  border-radius: 6px;
   cursor: pointer;
+}
+
+.toolbar__mode-btn:last-child {
+  border-right: none;
 }
 
 .toolbar__mode-btn:hover {
   background: var(--bg-hover);
+  color: var(--text);
 }
 
 .toolbar__mode-btn--active {
   background: var(--bg-active);
   color: var(--accent);
-  border-color: var(--accent);
-  font-weight: 600;
 }
 
 .toolbar__error {
@@ -245,35 +275,120 @@ body {
   font-size: 13px;
 }
 
-.toolbar__save {
-  padding: 6px 16px;
-  font-size: 13px;
-}
-
-.toolbar__save:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.toolbar__toc-btn {
-  padding: 5px 12px;
-  font-size: 13px;
+/* Standalone icon buttons — TOC toggle (sits near the TOC panel, on the right)
+   and Save (top-right-most, primary action). */
+.toolbar__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--bg);
   color: var(--text-muted);
-  border-radius: 6px;
   cursor: pointer;
 }
 
-.toolbar__toc-btn:hover {
+.toolbar__icon-btn:hover {
   background: var(--bg-hover);
+  color: var(--text);
 }
 
-.toolbar__toc-btn--active {
+.toolbar__icon-btn--active {
   background: var(--bg-active);
   color: var(--accent);
   border-color: var(--accent);
-  font-weight: 600;
+}
+
+.toolbar__icon-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.toolbar__icon-btn--primary:hover {
+  opacity: 0.9;
+  background: var(--accent);
+  color: white;
+}
+
+.toolbar__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Find-in-document bar */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.search-bar__input {
+  flex: 1;
+  max-width: 320px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.search-bar__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search-bar__count {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 70px;
+}
+
+.search-bar__nav-btn,
+.search-bar__close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.search-bar__nav-btn:hover,
+.search-bar__close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.search-bar__nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.search-bar__close-btn {
+  margin-left: auto;
+}
+
+::highlight(md-search-match) {
+  background-color: var(--search-match-bg);
+  color: var(--search-match-text);
+}
+
+::highlight(md-search-current) {
+  background-color: var(--search-current-bg);
+  color: var(--search-current-text);
 }
 
 /* Editor / preview split */
@@ -643,6 +758,7 @@ body {
   .drag-overlay,
   .drop-zone,
   .toolbar,
+  .search-bar,
   .pane--editor {
     display: none !important;
   }
