@@ -1,6 +1,8 @@
 import React, { forwardRef, useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
+import { EditorState, StateEffect, StateField } from '@codemirror/state'
 import {
+  Decoration,
+  type DecorationSet,
   EditorView,
   keymap,
   drawSelection,
@@ -14,6 +16,32 @@ import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { useAppState } from '../../state/AppContext'
+import { findStringMatches } from '../../lib/searchHighlight'
+
+const searchMatchMark = Decoration.mark({ class: 'cm-search-match' })
+const searchCurrentMark = Decoration.mark({ class: 'cm-search-current' })
+
+const setSearchMatches = StateEffect.define<{ matches: { from: number; to: number }[]; currentIndex: number }>()
+
+const searchMatchField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none
+  },
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const effect of tr.effects) {
+      if (effect.is(setSearchMatches)) {
+        const { matches, currentIndex } = effect.value
+        const marks = matches
+          .filter((m) => m.to <= tr.state.doc.length)
+          .map((m, i) => (i === currentIndex ? searchCurrentMark : searchMatchMark).range(m.from, m.to))
+        deco = Decoration.set(marks, true)
+      }
+    }
+    return deco
+  },
+  provide: (field) => EditorView.decorations.from(field)
+})
 
 // Reuses the same --hljs-* palette as rendered code blocks, so the raw markdown
 // source and the highlighted preview agree on color regardless of light/dark theme.
@@ -69,7 +97,8 @@ const editorTheme = EditorView.theme({
 })
 
 const EditorPane = forwardRef<HTMLElement>(function EditorPane(_props, forwardedRef) {
-  const { currentContent, setContent } = useAppState()
+  const { currentContent, setContent, viewMode, searchQuery, currentMatchIndex, setSearchMatchCount } =
+    useAppState()
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const lastKnownContent = useRef(currentContent)
@@ -89,6 +118,7 @@ const EditorPane = forwardRef<HTMLElement>(function EditorPane(_props, forwarded
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         markdown({ base: markdownLanguage, codeLanguages: languages }),
         syntaxHighlighting(markdownHighlightStyle),
+        searchMatchField,
         editorTheme,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -127,6 +157,29 @@ const EditorPane = forwardRef<HTMLElement>(function EditorPane(_props, forwarded
     lastKnownContent.current = incoming
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: incoming } })
   }, [currentContent])
+
+  // The preview pane is hidden in Edit-only mode, so it can't own search there —
+  // the editor takes over as the source of truth for the match count/highlighting
+  // whenever it's the only (or the) visible surface for reading raw text.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+
+    if (viewMode !== 'edit') {
+      view.dispatch({ effects: setSearchMatches.of({ matches: [], currentIndex: -1 }) })
+      return
+    }
+
+    const matches = findStringMatches(currentContent ?? '', searchQuery)
+    setSearchMatchCount(matches.length)
+    const currentIndex = matches.length === 0 ? -1 : Math.min(currentMatchIndex, matches.length - 1)
+    view.dispatch({ effects: setSearchMatches.of({ matches, currentIndex }) })
+
+    if (currentIndex >= 0) {
+      const target = matches[currentIndex]
+      view.dispatch({ effects: EditorView.scrollIntoView(target.from, { y: 'center' }) })
+    }
+  }, [viewMode, searchQuery, currentContent, currentMatchIndex, setSearchMatchCount])
 
   return <div className="editor-pane" ref={containerRef} />
 })

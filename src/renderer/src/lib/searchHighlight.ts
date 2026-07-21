@@ -11,7 +11,8 @@ function wildcardToRegExp(pattern: string): RegExp {
 /** Finds every occurrence of `query` (supporting `*`/`?` wildcards) within the
  * text nodes under `root`, as DOM Ranges — used with the CSS Custom Highlight
  * API so matches can be highlighted without mutating the DOM (which would
- * conflict with React's reconciliation of the same subtree). */
+ * conflict with React's reconciliation of the same subtree). Used for the
+ * rendered preview, where content differs from the raw markdown source. */
 export function findTextRanges(root: HTMLElement, query: string): Range[] {
   const trimmed = query.trim()
   if (!trimmed) return []
@@ -37,4 +38,29 @@ export function findTextRanges(root: HTMLElement, query: string): Range[] {
     }
   }
   return ranges
+}
+
+export interface StringMatch {
+  from: number
+  to: number
+}
+
+/** Same matching (wildcards included) as `findTextRanges`, but against a plain
+ * string offset-for-offset — used for the raw-markdown CodeMirror editor,
+ * where positions map directly onto the document without any DOM involved. */
+export function findStringMatches(text: string, query: string): StringMatch[] {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  const pattern = wildcardToRegExp(trimmed)
+  const matches: StringMatch[] = []
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(text))) {
+    if (match[0].length === 0) {
+      pattern.lastIndex += 1
+      continue
+    }
+    matches.push({ from: match.index, to: match.index + match[0].length })
+  }
+  return matches
 }

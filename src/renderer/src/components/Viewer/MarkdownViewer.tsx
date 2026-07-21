@@ -33,6 +33,7 @@ export default function MarkdownViewer(): React.JSX.Element {
     currentContent,
     selectFile,
     setHeadings,
+    viewMode,
     searchQuery,
     currentMatchIndex,
     setSearchMatchCount
@@ -52,10 +53,18 @@ export default function MarkdownViewer(): React.JSX.Element {
   // Highlight search matches via the CSS Custom Highlight API — this only affects
   // rendering, so it can't conflict with React's reconciliation of this subtree
   // the way wrapping matches in <mark> elements directly in the DOM would.
+  // The preview is hidden entirely in Edit-only mode, so the editor takes over
+  // as the source of truth for the match count/highlighting there instead.
   useEffect(() => {
     const container = containerRef.current
     const highlights = (CSS as unknown as { highlights?: Map<string, Highlight> }).highlights
     if (!container || !highlights) return
+
+    if (viewMode === 'edit') {
+      highlights.delete(SEARCH_MATCH_HIGHLIGHT)
+      highlights.delete(SEARCH_CURRENT_HIGHLIGHT)
+      return
+    }
 
     const ranges = findTextRanges(container, searchQuery)
     setSearchMatchCount(ranges.length)
@@ -81,7 +90,7 @@ export default function MarkdownViewer(): React.JSX.Element {
       highlights.delete(SEARCH_MATCH_HIGHLIGHT)
       highlights.delete(SEARCH_CURRENT_HIGHLIGHT)
     }
-  }, [searchQuery, currentContent, currentMatchIndex, setSearchMatchCount])
+  }, [viewMode, searchQuery, currentContent, currentMatchIndex, setSearchMatchCount])
 
   const components = useMemo(() => {
     function handleLinkClick(e: React.MouseEvent<HTMLAnchorElement>, href: string | undefined): void {

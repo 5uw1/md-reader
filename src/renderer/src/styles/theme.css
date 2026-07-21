@@ -395,6 +395,19 @@ body {
   color: var(--search-current-text);
 }
 
+/* Same colors as the preview's ::highlight() search marks, applied as regular
+   CodeMirror decoration classes since the editor can't use the Highlight API
+   (it needs to compose with its own syntax-highlighting spans). */
+.cm-search-match {
+  background-color: var(--search-match-bg);
+  color: var(--search-match-text);
+}
+
+.cm-search-current {
+  background-color: var(--search-current-bg);
+  color: var(--search-current-text);
+}
+
 /* Editor / preview split */
 .app__content {
   flex: 1;
