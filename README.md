@@ -2,6 +2,10 @@
 
 A desktop Markdown reader and editor, built with Electron, React, and TypeScript. Drag in a single `.md` file or a whole folder and read it as a formatted document — with GitHub-flavored markdown, math, diagrams, an editor with live preview, and export to PDF.
 
+## Download
+
+Grab the latest portable Windows build from the [Releases page](https://github.com/5uw1/md-reader/releases/latest) — a single `.exe`, no installer, no admin rights needed. Just download and run it. It's unsigned, so Windows SmartScreen may warn on first launch ("More info" → "Run anyway").
+
 ## Features
 
 - **Drag & drop** a `.md` file or a folder anywhere onto the window (or use File → Open File… / Open Folder…)
@@ -44,8 +48,19 @@ This launches the app in development mode with hot reload.
 ```bash
 npm run typecheck   # type-check the whole project
 npm run build        # production build
-npm run build:win    # build + package a Windows installer (electron-builder)
+npm run build:win    # build + package a portable Windows .exe (electron-builder)
 ```
+
+## Releasing
+
+Pushing a tag matching `v*` (e.g. `v0.2.0`) triggers a GitHub Actions build that packages the portable Windows `.exe` and publishes it to the [Releases page](https://github.com/5uw1/md-reader/releases) automatically:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The workflow can also be run manually (without a tag) from the Actions tab, which just builds and attaches the `.exe` as a workflow artifact for testing.
 
 ## Tech Stack
 

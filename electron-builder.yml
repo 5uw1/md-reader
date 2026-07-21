@@ -9,9 +9,13 @@ files:
   - '!electron.vite.config.{js,ts,mjs,cjs}'
 win:
   target:
-    - target: nsis
+    - target: portable
       arch:
         - x64
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
+portable:
+  artifactName: '${productName}-${version}-portable.${ext}'
+publish:
+  provider: github
+  owner: 5uw1
+  repo: md-reader
+  releaseType: release
