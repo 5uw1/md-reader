@@ -1,10 +1,13 @@
 # MD Reader
 
+[![Build](https://github.com/5uw1/md-reader/actions/workflows/build.yml/badge.svg)](https://github.com/5uw1/md-reader/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/release/5uw1/md-reader?label=latest%20release)](https://github.com/5uw1/md-reader/releases/latest)
+
 A desktop Markdown reader and editor, built with Electron, React, and TypeScript. Drag in a single `.md` file or a whole folder and read it as a formatted document — with GitHub-flavored markdown, math, diagrams, an editor with live preview, and export to PDF.
 
 ## Download
 
-Grab the latest portable Windows build from the [Releases page](https://github.com/5uw1/md-reader/releases/latest) — a single `.exe`, no installer, no admin rights needed. Just download and run it. It's unsigned, so Windows SmartScreen may warn on first launch ("More info" → "Run anyway").
+[**⬇ Download the latest portable build**](https://github.com/5uw1/md-reader/releases/latest) — a single `.exe`, no installer, no admin rights needed. Just download and run it. It's unsigned, so Windows SmartScreen may warn on first launch ("More info" → "Run anyway").
 
 ## Features
 
