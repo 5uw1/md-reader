@@ -63,6 +63,8 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
+Release notes are generated automatically by GitHub from the commits since the previous tag (a "What's Changed" list plus a full-diff link) — nothing to write by hand. Writing clear, conventional commit messages (`feat: …`, `fix: …`) makes these notes more readable, since each commit shows up as its own line.
+
 Pre-release tags work the same way — anything with a `-` suffix (`v0.2.0-rc1`, `v0.2.0-pre0`, etc.) is published too, but marked as a **prerelease** on GitHub instead of a full release.
 
 Every other push to `main` (i.e. without a tag), and every manual run from the Actions tab, builds a uniquely-numbered dev build instead — version `<current>-dev.<run number>` (e.g. `0.1.1-dev.42`), auto-incrementing on every run. These are **not** published to the Releases page; they're only available as a downloadable workflow artifact from that run, for testing.

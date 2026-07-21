@@ -14,8 +14,3 @@ win:
         - x64
 portable:
   artifactName: '${productName}-${version}-portable.${ext}'
-publish:
-  provider: github
-  owner: 5uw1
-  repo: md-reader
-  releaseType: release

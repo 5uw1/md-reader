@@ -59,15 +59,31 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           npm version --no-git-tag-version "${CURRENT_VERSION}-dev.${{ github.run_number }}"
 
-      # Tag pushes: build and publish a GitHub Release with the portable .exe attached.
-      - name: Build and publish release
+      # Tag pushes: build the portable .exe (electron-builder doesn't publish it —
+      # the release itself, with auto-generated notes, is created in the next step).
+      - name: Build portable exe
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          npx electron-vite build
+          npx electron-builder --win --publish never
+
+      # Create the GitHub Release with notes auto-generated from commits since the
+      # last tag (GitHub's built-in "What's Changed" + full-changelog link — no
+      # changelog file to maintain), and attach the portable .exe to it.
+      - name: Create release with auto-generated notes
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx electron-vite build
-          npx electron-builder --win --publish always "-c.publish.releaseType=${RELEASE_TYPE}"
+          PRERELEASE_FLAG=""
+          if [ "$RELEASE_TYPE" = "prerelease" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/*.exe \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            $PRERELEASE_FLAG
 
       # Push to main / manual runs: build and upload the portable .exe as a workflow
       # artifact only — never published as a public release.
