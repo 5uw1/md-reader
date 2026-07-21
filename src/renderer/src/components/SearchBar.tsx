@@ -27,7 +27,8 @@ export default function SearchBar(): React.JSX.Element {
         ref={inputRef}
         className="search-bar__input"
         type="text"
-        placeholder="Find in document…"
+        placeholder="Find in document… (* and ? wildcards supported)"
+        title="Supports wildcards: * matches any run of characters, ? matches a single character"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onKeyDown={handleKeyDown}
