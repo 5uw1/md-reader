@@ -56,14 +56,16 @@ npm run build:win    # build + package a portable Windows .exe (electron-builder
 
 ## Releasing
 
-Pushing a tag matching `v*` (e.g. `v0.2.0`) triggers a GitHub Actions build that packages the portable Windows `.exe` and publishes it to the [Releases page](https://github.com/5uw1/md-reader/releases) automatically:
+Pushing a tag matching `v*` builds the portable Windows `.exe` and publishes it to the [Releases page](https://github.com/5uw1/md-reader/releases) automatically:
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-The workflow can also be run manually (without a tag) from the Actions tab, which just builds and attaches the `.exe` as a workflow artifact for testing.
+Pre-release tags work the same way — anything with a `-` suffix (`v0.2.0-rc1`, `v0.2.0-pre0`, etc.) is published too, but marked as a **prerelease** on GitHub instead of a full release.
+
+Every other push to `main` (i.e. without a tag), and every manual run from the Actions tab, builds a uniquely-numbered dev build instead — version `<current>-dev.<run number>` (e.g. `0.1.1-dev.42`), auto-incrementing on every run. These are **not** published to the Releases page; they're only available as a downloadable workflow artifact from that run, for testing.
 
 ## Tech Stack
 
