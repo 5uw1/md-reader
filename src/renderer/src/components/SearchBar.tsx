@@ -36,25 +36,27 @@ export default function SearchBar(): React.JSX.Element {
       <span className="search-bar__count">
         {searchQuery ? (searchMatchCount > 0 ? `${currentMatchIndex + 1} of ${searchMatchCount}` : 'No results') : ''}
       </span>
-      <button
-        className="search-bar__nav-btn"
-        disabled={searchMatchCount === 0}
-        title="Previous match (Shift+Enter)"
-        onClick={goToPreviousMatch}
-      >
-        <ChevronUpIcon />
-      </button>
-      <button
-        className="search-bar__nav-btn"
-        disabled={searchMatchCount === 0}
-        title="Next match (Enter)"
-        onClick={goToNextMatch}
-      >
-        <ChevronDownIcon />
-      </button>
-      <button className="search-bar__close-btn" title="Close (Esc)" onClick={() => setShowSearch(false)}>
-        <CloseIcon />
-      </button>
+      <div className="search-bar__actions">
+        <button
+          className="search-bar__nav-btn"
+          disabled={searchMatchCount === 0}
+          title="Previous match (Shift+Enter)"
+          onClick={goToPreviousMatch}
+        >
+          <ChevronUpIcon />
+        </button>
+        <button
+          className="search-bar__nav-btn"
+          disabled={searchMatchCount === 0}
+          title="Next match (Enter)"
+          onClick={goToNextMatch}
+        >
+          <ChevronDownIcon />
+        </button>
+        <button className="search-bar__close-btn" title="Close (Esc)" onClick={() => setShowSearch(false)}>
+          <CloseIcon />
+        </button>
+      </div>
     </div>
   )
 }

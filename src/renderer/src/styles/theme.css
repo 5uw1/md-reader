@@ -331,7 +331,7 @@ body {
 
 .search-bar__input {
   flex: 1;
-  max-width: 320px;
+  min-width: 0;
   padding: 6px 10px;
   font-size: 13px;
   border: 1px solid var(--border);
@@ -346,9 +346,17 @@ body {
 }
 
 .search-bar__count {
+  flex-shrink: 0;
   font-size: 12px;
   color: var(--text-muted);
   min-width: 70px;
+}
+
+.search-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .search-bar__nav-btn,
@@ -375,10 +383,6 @@ body {
 .search-bar__nav-btn:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-.search-bar__close-btn {
-  margin-left: auto;
 }
 
 ::highlight(md-search-match) {
