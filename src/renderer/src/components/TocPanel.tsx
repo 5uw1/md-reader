@@ -1,7 +1,11 @@
 import React from 'react'
 import { useAppState } from '../state/AppContext'
 
-export default function TocPanel(): React.JSX.Element | null {
+interface TocPanelProps {
+  width: number
+}
+
+export default function TocPanel({ width }: TocPanelProps): React.JSX.Element | null {
   const { headings, activeHeadingId } = useAppState()
 
   if (headings.length === 0) return null
@@ -13,7 +17,7 @@ export default function TocPanel(): React.JSX.Element | null {
   }
 
   return (
-    <aside className="app__toc">
+    <aside className="app__toc" style={{ width }}>
       <div className="toc__label">On this page</div>
       <nav aria-label="Table of contents">
         {headings.map((h) => (

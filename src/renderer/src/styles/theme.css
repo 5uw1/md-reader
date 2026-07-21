@@ -139,7 +139,6 @@ body {
 }
 
 .app__sidebar {
-  width: 280px;
   flex-shrink: 0;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
@@ -147,12 +146,45 @@ body {
 }
 
 .app__toc {
-  width: 240px;
   flex-shrink: 0;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border);
   overflow-y: auto;
   padding: 16px 0;
+}
+
+.resize-handle {
+  width: 6px;
+  flex-shrink: 0;
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 1;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+
+.resize-handle:hover::after {
+  background: var(--accent);
+  width: 2px;
+}
+
+body.resizing-col {
+  cursor: col-resize !important;
+}
+
+body.resizing-col * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .toc__label {
@@ -772,6 +804,7 @@ body {
 
   .app__sidebar,
   .app__toc,
+  .resize-handle,
   .drag-overlay,
   .drop-zone,
   .toolbar,

@@ -4,6 +4,7 @@ import { ThemeProvider } from './state/ThemeContext'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useSplitScrollSync } from './hooks/useSplitScrollSync'
 import { useActiveHeading } from './hooks/useActiveHeading'
+import { useResizableWidth } from './hooks/useResizableWidth'
 import DropZone from './components/DropZone'
 import FileTree from './components/Sidebar/FileTree'
 import Toolbar from './components/Toolbar'
@@ -19,6 +20,21 @@ function Shell(): React.JSX.Element {
   // node is ever replaced, e.g. EditorPane remounting.
   const [previewEl, setPreviewEl] = useState<HTMLDivElement | null>(null)
   const [editorEl, setEditorEl] = useState<HTMLElement | null>(null)
+
+  const sidebarResize = useResizableWidth({
+    storageKey: 'md-reader-sidebar-width',
+    defaultWidth: 280,
+    minWidth: 160,
+    maxWidth: 560,
+    handleEdge: 'right'
+  })
+  const tocResize = useResizableWidth({
+    storageKey: 'md-reader-toc-width',
+    defaultWidth: 240,
+    minWidth: 160,
+    maxWidth: 560,
+    handleEdge: 'left'
+  })
 
   useEffect(() => {
     return window.api.onMenuOpen((result) => {
@@ -36,9 +52,12 @@ function Shell(): React.JSX.Element {
       ) : (
         <div className="app__layout">
           {mode === 'folder' && (
-            <aside className="app__sidebar">
-              <FileTree />
-            </aside>
+            <>
+              <aside className="app__sidebar" style={{ width: sidebarResize.width }}>
+                <FileTree />
+              </aside>
+              <div className="resize-handle" onPointerDown={sidebarResize.onPointerDown} />
+            </>
           )}
           <main className="app__main">
             <Toolbar />
@@ -55,7 +74,12 @@ function Shell(): React.JSX.Element {
               </div>
             </div>
           </main>
-          {showToc && <TocPanel />}
+          {showToc && headings.length > 0 && (
+            <>
+              <div className="resize-handle" onPointerDown={tocResize.onPointerDown} />
+              <TocPanel width={tocResize.width} />
+            </>
+          )}
         </div>
       )}
       {isDraggingOver && (
