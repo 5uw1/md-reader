@@ -81,6 +81,47 @@ async function registerFileAssociation(): Promise<void> {
   }
 }
 
+/** Asks the renderer to save (which itself prompts for a location if the
+ *  current document is an unsaved draft), and waits for the result. */
+function requestRendererSave(window: BrowserWindow): Promise<boolean> {
+  return new Promise((resolve) => {
+    ipcMain.once('app:save-before-close-result', (_event, success: boolean) => resolve(success))
+    window.webContents.send('app:save-before-close-request')
+  })
+}
+
+let allowNextClose = false
+
+/** Electron doesn't show any UI for a renderer's `beforeunload` prevention —
+ *  it just silently blocks the window from closing. Unsaved-changes
+ *  confirmation has to happen here instead, where we can show a real dialog. */
+function attachCloseGuard(window: BrowserWindow): void {
+  window.on('close', (event) => {
+    if (allowNextClose || !isDirty) return
+    event.preventDefault()
+
+    void (async () => {
+      const { response } = await dialog.showMessageBox(window, {
+        type: 'warning',
+        buttons: ['Save', "Don't Save", 'Cancel'],
+        defaultId: 0,
+        cancelId: 2,
+        message: 'You have unsaved changes.',
+        detail: 'Do you want to save your changes before closing?'
+      })
+
+      if (response === 2) return // Cancel
+      if (response === 0) {
+        const saved = await requestRendererSave(window)
+        if (!saved) return // save failed, or the Save As dialog was canceled
+      }
+
+      allowNextClose = true
+      window.close()
+    })()
+  })
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -104,6 +145,8 @@ function createWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  attachCloseGuard(mainWindow)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -142,20 +185,18 @@ async function openFolderDialog() {
   return resolveOpenPathAndRecord(result.filePaths[0])
 }
 
-async function newFileDialog(defaultDir?: string): Promise<string | null> {
+/** Just picks a save location — the renderer writes the actual draft content
+ *  itself afterward via fs:writeFile, then records it as opened. */
+async function saveFileDialog(defaultDir?: string): Promise<string | null> {
   if (!mainWindow) return null
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'New Markdown File',
+    title: 'Save Markdown File',
     defaultPath: join(defaultDir ?? app.getPath('documents'), 'Untitled.md'),
     filters: [{ name: 'Markdown', extensions: ['md'] }]
   })
   if (result.canceled || !result.filePath) return null
 
-  const filePath = /\.[^/\\]+$/.test(result.filePath) ? result.filePath : `${result.filePath}.md`
-  await fs.writeFile(filePath, '', 'utf-8')
-  recentEntries = await addRecent(filePath, 'file')
-  buildMenu()
-  return filePath
+  return /\.[^/\\]+$/.test(result.filePath) ? result.filePath : `${result.filePath}.md`
 }
 
 async function openRecentEntry(entry: RecentEntry): Promise<void> {
@@ -255,7 +296,7 @@ function buildMenu(): void {
         {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
-          enabled: !!currentFilePath && isDirty,
+          enabled: isDirty,
           click: () => requestSaveFromMenu()
         },
         { type: 'separator' },
@@ -376,7 +417,7 @@ if (!gotSingleInstanceLock) {
     ipcMain.handle('fs:resolveOpenPath', (_event, targetPath: string) => resolveOpenPathAndRecord(targetPath))
     ipcMain.handle('dialog:openFile', () => openFileDialog())
     ipcMain.handle('dialog:openFolder', () => openFolderDialog())
-    ipcMain.handle('dialog:newFile', (_event, defaultDir?: string) => newFileDialog(defaultDir))
+    ipcMain.handle('dialog:saveFile', (_event, defaultDir?: string) => saveFileDialog(defaultDir))
     ipcMain.handle('shell:openExternal', (_event, url: string) => shell.openExternal(url))
     ipcMain.on('theme:report', (_event, theme: ThemeMode) => {
       currentTheme = theme

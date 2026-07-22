@@ -2,7 +2,7 @@ import React from 'react'
 import { useAppState } from '../state/AppContext'
 import { baseName } from '../lib/pathUtils'
 import type { ViewMode } from '../../../shared/types'
-import { PreviewIcon, EditIcon, SplitIcon, ContentsIcon, SaveIcon, SearchIcon } from './icons'
+import { PreviewIcon, EditIcon, SplitIcon, ContentsIcon, SaveIcon, SearchIcon, CloseIcon } from './icons'
 
 const MODES: { value: ViewMode; label: string; Icon: typeof PreviewIcon }[] = [
   { value: 'preview', label: 'Preview', Icon: PreviewIcon },
@@ -13,6 +13,7 @@ const MODES: { value: ViewMode; label: string; Icon: typeof PreviewIcon }[] = [
 export default function Toolbar(): React.JSX.Element {
   const {
     currentFilePath,
+    currentContent,
     viewMode,
     setViewMode,
     headings,
@@ -22,18 +23,31 @@ export default function Toolbar(): React.JSX.Element {
     setShowSearch,
     isDirty,
     saveCurrentFile,
+    dismissDraft,
     loading,
     error
   } = useAppState()
 
   const canSave = viewMode !== 'preview'
+  const isDraft = !currentFilePath && currentContent !== undefined
 
   return (
     <div className="toolbar">
       <span className="toolbar__filename" title={currentFilePath}>
-        {currentFilePath ? baseName(currentFilePath) : ''}
+        {currentFilePath ? baseName(currentFilePath) : isDraft ? 'Untitled' : ''}
         {isDirty && <span className="toolbar__dirty-dot" title="Unsaved changes" />}
       </span>
+
+      {isDraft && (
+        <button
+          className="toolbar__icon-btn"
+          aria-label="Dismiss draft"
+          title="Dismiss draft"
+          onClick={() => dismissDraft()}
+        >
+          <CloseIcon />
+        </button>
+      )}
 
       <div className="toolbar__spacer" />
 
@@ -43,7 +57,7 @@ export default function Toolbar(): React.JSX.Element {
         className="toolbar__icon-btn toolbar__icon-btn--primary"
         style={{ visibility: canSave ? 'visible' : 'hidden' }}
         aria-label="Save"
-        title="Save (Ctrl+S)"
+        title={isDraft ? 'Save As… (Ctrl+S)' : 'Save (Ctrl+S)'}
         disabled={!canSave || !isDirty || loading}
         onClick={() => void saveCurrentFile()}
       >

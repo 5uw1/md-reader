@@ -56,6 +56,8 @@ type Action =
   | { type: 'SAVE_START' }
   | { type: 'SAVE_SUCCESS' }
   | { type: 'SAVE_ERROR'; message: string }
+  | { type: 'NEW_DRAFT' }
+  | { type: 'DISMISS_DRAFT' }
   | { type: 'RESET' }
 
 function makeInitialState(): AppState {
@@ -157,6 +159,36 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, savedContent: state.currentContent }
     case 'SAVE_ERROR':
       return { ...state, error: action.message }
+    case 'NEW_DRAFT':
+      return {
+        ...state,
+        mode: state.mode === 'folder' ? 'folder' : 'file',
+        currentFilePath: undefined,
+        // Untouched draft starts clean (savedContent matches) — only becomes
+        // dirty, and prompts on discard, once the user actually types.
+        currentContent: '',
+        savedContent: '',
+        headings: [],
+        error: undefined,
+        showSearch: false,
+        searchQuery: '',
+        searchMatchCount: 0,
+        currentMatchIndex: 0
+      }
+    case 'DISMISS_DRAFT':
+      return state.mode === 'folder'
+        ? {
+            ...state,
+            currentFilePath: undefined,
+            currentContent: undefined,
+            savedContent: undefined,
+            headings: [],
+            showSearch: false,
+            searchQuery: '',
+            searchMatchCount: 0,
+            currentMatchIndex: 0
+          }
+        : makeInitialState()
     case 'RESET':
       return makeInitialState()
     default:
@@ -168,7 +200,8 @@ interface AppContextValue extends AppState {
   isDirty: boolean
   openPath: (targetPath: string) => Promise<void>
   openResult: (result: OpenPathResult) => Promise<void>
-  createNewFile: () => Promise<void>
+  createNewFile: () => void
+  dismissDraft: () => void
   selectFile: (filePath: string) => Promise<void>
   setContent: (content: string) => void
   setViewMode: (mode: ViewMode) => void
@@ -180,7 +213,7 @@ interface AppContextValue extends AppState {
   setSearchMatchCount: (count: number) => void
   goToNextMatch: () => void
   goToPreviousMatch: () => void
-  saveCurrentFile: () => Promise<void>
+  saveCurrentFile: () => Promise<boolean>
   reset: () => void
 }
 
@@ -218,15 +251,44 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     [loadFile]
   )
 
-  const openResult = useCallback(
+  // Unchecked core of openResult — no discard-confirmation. Used internally
+  // when the "unsaved changes" have just been written to disk ourselves (e.g.
+  // finishing a Save As), where re-confirming would be a spurious prompt.
+  const applyOpenResult = useCallback(
     async (result: OpenPathResult) => {
-      if (!confirmDiscardIfDirty()) return
       dispatch({ type: 'OPEN_RESULT', payload: result })
       if (result.defaultFilePath) {
         await loadFile(result.defaultFilePath)
       }
     },
     [loadFile]
+  )
+
+  const openResult = useCallback(
+    async (result: OpenPathResult) => {
+      if (!confirmDiscardIfDirty()) return
+      await applyOpenResult(result)
+    },
+    [applyOpenResult]
+  )
+
+  // Folder-aware: if the given path lives inside the currently open folder,
+  // rescans and selects it there; otherwise switches to standalone file mode.
+  const applyOpenedFilePath = useCallback(
+    async (newPath: string) => {
+      const s = stateRef.current
+      const normalize = (p: string): string => p.replace(/\\/g, '/').toLowerCase()
+      const inCurrentFolder =
+        s.mode === 'folder' && !!s.rootPath && normalize(newPath).startsWith(`${normalize(s.rootPath)}/`)
+
+      if (inCurrentFolder && s.rootPath) {
+        const tree = await window.api.scanFolder(s.rootPath)
+        await applyOpenResult({ kind: 'folder', rootPath: s.rootPath, tree, defaultFilePath: newPath })
+      } else {
+        await applyOpenResult({ kind: 'file', rootPath: newPath, defaultFilePath: newPath })
+      }
+    },
+    [applyOpenResult]
   )
 
   const openPath = useCallback(
@@ -247,23 +309,17 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     [openResult]
   )
 
-  const createNewFile = useCallback(async () => {
-    const s = stateRef.current
-    const defaultDir = s.mode === 'folder' ? s.rootPath : undefined
-    const newPath = await window.api.newFileDialog(defaultDir)
-    if (!newPath) return
+  // Opens an in-memory draft immediately — no dialog, nothing touches disk
+  // until the user actually saves it (or discards it via dismissDraft).
+  const createNewFile = useCallback(() => {
+    if (!confirmDiscardIfDirty()) return
+    dispatch({ type: 'NEW_DRAFT' })
+  }, [])
 
-    const normalize = (p: string): string => p.replace(/\\/g, '/').toLowerCase()
-    const inCurrentFolder =
-      s.mode === 'folder' && !!s.rootPath && normalize(newPath).startsWith(`${normalize(s.rootPath)}/`)
-
-    if (inCurrentFolder && s.rootPath) {
-      const tree = await window.api.scanFolder(s.rootPath)
-      await openResult({ kind: 'folder', rootPath: s.rootPath, tree, defaultFilePath: newPath })
-    } else {
-      await openResult({ kind: 'file', rootPath: newPath, defaultFilePath: newPath })
-    }
-  }, [openResult])
+  const dismissDraft = useCallback(() => {
+    if (!confirmDiscardIfDirty()) return
+    dispatch({ type: 'DISMISS_DRAFT' })
+  }, [])
 
   const setContent = useCallback((content: string) => dispatch({ type: 'SET_CONTENT', content }), [])
 
@@ -298,18 +354,37 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
 
   const goToPreviousMatch = useCallback(() => dispatch({ type: 'PREV_MATCH' }), [])
 
-  const saveCurrentFile = useCallback(async () => {
+  // Saves the current buffer. A draft with no path yet prompts for one first
+  // (Save As); returns false if there was nothing to write it to (dialog
+  // canceled) or the write itself failed, true otherwise.
+  const saveCurrentFile = useCallback(async (): Promise<boolean> => {
     const s = stateRef.current
-    if (!s.currentFilePath || s.currentContent === undefined) return
-    if (s.currentContent === s.savedContent) return
+    if (s.currentContent === undefined) return true
+    if (s.currentFilePath && s.currentContent === s.savedContent) return true
+
+    let targetPath = s.currentFilePath
+    if (!targetPath) {
+      const defaultDir = s.mode === 'folder' ? s.rootPath : undefined
+      const chosen = await window.api.saveFileDialog(defaultDir)
+      if (!chosen) return false
+      targetPath = chosen
+    }
+
     dispatch({ type: 'SAVE_START' })
     try {
-      await window.api.writeFile(s.currentFilePath, s.currentContent)
-      dispatch({ type: 'SAVE_SUCCESS' })
+      await window.api.writeFile(targetPath, s.currentContent)
     } catch (err) {
       dispatch({ type: 'SAVE_ERROR', message: (err as Error).message })
+      return false
     }
-  }, [])
+
+    if (targetPath === s.currentFilePath) {
+      dispatch({ type: 'SAVE_SUCCESS' })
+    } else {
+      await applyOpenedFilePath(targetPath)
+    }
+    return true
+  }, [applyOpenedFilePath])
 
   const reset = useCallback(() => dispatch({ type: 'RESET' }), [])
 
@@ -344,18 +419,17 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     })
   }, [saveCurrentFile])
 
+  // The main process intercepts the window close itself (asking Save/Don't
+  // Save/Cancel) when it knows there are unsaved changes; this just carries
+  // out "Save" if the user picks it, and reports back whether it succeeded.
   useEffect(() => {
-    function handleBeforeUnload(e: BeforeUnloadEvent): void {
-      const s = stateRef.current
-      const dirty = s.currentContent !== undefined && s.currentContent !== s.savedContent
-      if (dirty) {
-        e.preventDefault()
-        e.returnValue = ''
-      }
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [])
+    return window.api.onSaveBeforeCloseRequested(() => {
+      void (async () => {
+        const success = await saveCurrentFile()
+        window.api.reportSaveBeforeCloseResult(success)
+      })()
+    })
+  }, [saveCurrentFile])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -375,6 +449,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       openPath,
       openResult,
       createNewFile,
+      dismissDraft,
       selectFile,
       setContent,
       setViewMode,
@@ -395,6 +470,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       openPath,
       openResult,
       createNewFile,
+      dismissDraft,
       selectFile,
       setContent,
       setViewMode,

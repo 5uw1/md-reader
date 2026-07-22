@@ -11,8 +11,8 @@ const api = {
     ipcRenderer.invoke('fs:resolveOpenPath', targetPath),
   openFileDialog: (): Promise<OpenPathResult | null> => ipcRenderer.invoke('dialog:openFile'),
   openFolderDialog: (): Promise<OpenPathResult | null> => ipcRenderer.invoke('dialog:openFolder'),
-  newFileDialog: (defaultDir?: string): Promise<string | null> =>
-    ipcRenderer.invoke('dialog:newFile', defaultDir),
+  saveFileDialog: (defaultDir?: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:saveFile', defaultDir),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url),
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   onMenuOpen: (callback: (result: OpenPathResult) => void): (() => void) => {
@@ -43,7 +43,14 @@ const api = {
     const listener = (): void => callback()
     ipcRenderer.on('menu:new-file-request', listener)
     return () => ipcRenderer.removeListener('menu:new-file-request', listener)
-  }
+  },
+  onSaveBeforeCloseRequested: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('app:save-before-close-request', listener)
+    return () => ipcRenderer.removeListener('app:save-before-close-request', listener)
+  },
+  reportSaveBeforeCloseResult: (success: boolean): void =>
+    ipcRenderer.send('app:save-before-close-result', success)
 }
 
 export type Api = typeof api
