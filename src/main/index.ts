@@ -1,10 +1,16 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu, type MenuItemConstructorOptions } from 'electron'
 import { promises as fs } from 'fs'
-import { basename, dirname, join } from 'path'
+import { basename, dirname, extname, join } from 'path'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { readFile, resolveOpenPath, scanFolder, statPath } from './fileSystem'
 import { addRecent, clearRecent, loadRecent, removeRecent, type RecentEntry } from './recentFiles'
 import type { OpenPathResult, ThemeMode, ViewMode } from '../shared/types'
+
+const execFileAsync = promisify(execFile)
+const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mdown', '.mkd'])
+const MARKDOWN_PROG_ID = 'MDReader.Markdown'
 
 let mainWindow: BrowserWindow | null = null
 let currentTheme: ThemeMode = 'system'
@@ -12,6 +18,68 @@ let currentViewMode: ViewMode = 'preview'
 let currentFilePath: string | null = null
 let isDirty = false
 let recentEntries: RecentEntry[] = []
+
+/** Picks the markdown file path (if any) out of argv passed by Windows on
+ *  launch — e.g. double-clicking a .md file, or "Open with" > MD Reader. */
+function extractMarkdownArg(argv: string[]): string | undefined {
+  return argv.slice(1).find((arg) => MARKDOWN_EXTENSIONS.has(extname(arg).toLowerCase()))
+}
+
+async function openPathOnLaunch(targetPath: string): Promise<void> {
+  const result = await resolveOpenPathAndRecord(targetPath)
+  if (result) mainWindow?.webContents.send('menu:open-result', result)
+}
+
+async function registerFileAssociation(): Promise<void> {
+  if (process.platform !== 'win32') return
+  const exePath = process.execPath
+  try {
+    await execFileAsync('reg', [
+      'add',
+      `HKCU\\Software\\Classes\\${MARKDOWN_PROG_ID}`,
+      '/ve',
+      '/d',
+      'Markdown Document',
+      '/f'
+    ])
+    await execFileAsync('reg', [
+      'add',
+      `HKCU\\Software\\Classes\\${MARKDOWN_PROG_ID}\\DefaultIcon`,
+      '/ve',
+      '/d',
+      `${exePath},0`,
+      '/f'
+    ])
+    await execFileAsync('reg', [
+      'add',
+      `HKCU\\Software\\Classes\\${MARKDOWN_PROG_ID}\\shell\\open\\command`,
+      '/ve',
+      '/d',
+      `"${exePath}" "%1"`,
+      '/f'
+    ])
+    for (const ext of MARKDOWN_EXTENSIONS) {
+      await execFileAsync('reg', [
+        'add',
+        `HKCU\\Software\\Classes\\${ext}\\OpenWithProgids`,
+        '/v',
+        MARKDOWN_PROG_ID,
+        '/d',
+        '',
+        '/f'
+      ])
+    }
+    if (mainWindow) {
+      await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'MD Reader',
+        message: 'Added to the right-click "Open with" menu for Markdown files.'
+      })
+    }
+  } catch (err) {
+    dialog.showErrorBox('Could not register file association', (err as Error).message)
+  }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -198,6 +266,15 @@ function buildMenu(): void {
           click: () => exportCurrentToPdf()
         },
         { type: 'separator' },
+        ...(process.platform === 'win32'
+          ? [
+              {
+                label: 'Add to "Open With" Menu…',
+                click: () => void registerFileAssociation()
+              } as MenuItemConstructorOptions,
+              { type: 'separator' as const }
+            ]
+          : []),
         { role: 'quit' }
       ]
     },
@@ -265,51 +342,75 @@ function buildMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-app.whenReady().then(async () => {
-  electronApp.setAppUserModelId('com.mdreader.app')
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  // A second launch (e.g. double-clicking another .md file, or "Open with" while
+  // already running) shows up here instead of spawning a second window.
+  app.on('second-instance', (_event, argv) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+    const filePath = extractMarkdownArg(argv)
+    if (filePath) void openPathOnLaunch(filePath)
   })
 
-  recentEntries = await loadRecent()
+  app.whenReady().then(async () => {
+    electronApp.setAppUserModelId('com.mdreader.app')
 
-  ipcMain.handle('fs:statPath', (_event, targetPath: string) => statPath(targetPath))
-  ipcMain.handle('fs:scanFolder', (_event, rootPath: string) => scanFolder(rootPath))
-  ipcMain.handle('fs:readFile', (_event, filePath: string) => readFile(filePath))
-  ipcMain.handle('fs:writeFile', (_event, filePath: string, content: string) =>
-    fs.writeFile(filePath, content, 'utf-8')
-  )
-  ipcMain.handle('fs:resolveOpenPath', (_event, targetPath: string) => resolveOpenPathAndRecord(targetPath))
-  ipcMain.handle('dialog:openFile', () => openFileDialog())
-  ipcMain.handle('dialog:openFolder', () => openFolderDialog())
-  ipcMain.handle('dialog:newFile', (_event, defaultDir?: string) => newFileDialog(defaultDir))
-  ipcMain.handle('shell:openExternal', (_event, url: string) => shell.openExternal(url))
-  ipcMain.on('theme:report', (_event, theme: ThemeMode) => {
-    currentTheme = theme
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    recentEntries = await loadRecent()
+
+    ipcMain.handle('fs:statPath', (_event, targetPath: string) => statPath(targetPath))
+    ipcMain.handle('fs:scanFolder', (_event, rootPath: string) => scanFolder(rootPath))
+    ipcMain.handle('fs:readFile', (_event, filePath: string) => readFile(filePath))
+    ipcMain.handle('fs:writeFile', (_event, filePath: string, content: string) =>
+      fs.writeFile(filePath, content, 'utf-8')
+    )
+    ipcMain.handle('fs:resolveOpenPath', (_event, targetPath: string) => resolveOpenPathAndRecord(targetPath))
+    ipcMain.handle('dialog:openFile', () => openFileDialog())
+    ipcMain.handle('dialog:openFolder', () => openFolderDialog())
+    ipcMain.handle('dialog:newFile', (_event, defaultDir?: string) => newFileDialog(defaultDir))
+    ipcMain.handle('shell:openExternal', (_event, url: string) => shell.openExternal(url))
+    ipcMain.on('theme:report', (_event, theme: ThemeMode) => {
+      currentTheme = theme
+      buildMenu()
+    })
+    ipcMain.on('file:report-current', (_event, filePath: string | null) => {
+      currentFilePath = filePath
+      buildMenu()
+    })
+    ipcMain.on('viewmode:report', (_event, mode: ViewMode) => {
+      currentViewMode = mode
+      buildMenu()
+    })
+    ipcMain.on('file:report-dirty', (_event, dirty: boolean) => {
+      isDirty = dirty
+      buildMenu()
+    })
+
     buildMenu()
-  })
-  ipcMain.on('file:report-current', (_event, filePath: string | null) => {
-    currentFilePath = filePath
-    buildMenu()
-  })
-  ipcMain.on('viewmode:report', (_event, mode: ViewMode) => {
-    currentViewMode = mode
-    buildMenu()
-  })
-  ipcMain.on('file:report-dirty', (_event, dirty: boolean) => {
-    isDirty = dirty
-    buildMenu()
+    createWindow()
+
+    const initialFilePath = extractMarkdownArg(process.argv)
+    if (initialFilePath) {
+      mainWindow?.webContents.once('did-finish-load', () => {
+        void openPathOnLaunch(initialFilePath)
+      })
+    }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   })
 
-  buildMenu()
-  createWindow()
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
   })
-})
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+}
