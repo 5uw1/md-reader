@@ -91,6 +91,9 @@ const editorTheme = EditorView.theme({
   '.cm-selectionBackground': {
     backgroundColor: 'var(--bg-active) !important'
   },
+  '.cm-cursor': {
+    borderLeftColor: 'var(--text)'
+  },
   '.cm-placeholder': {
     color: 'var(--text-muted)'
   }

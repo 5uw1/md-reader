@@ -559,6 +559,13 @@ body.resizing-col * {
   font-size: 13px;
 }
 
+.file-tree__root-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 8px;
+}
+
 .file-tree__root-label {
   padding: 4px 12px 10px;
   font-weight: 600;
@@ -566,6 +573,31 @@ body.resizing-col * {
   letter-spacing: 0.04em;
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.file-tree__new-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.file-tree__new-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.file-tree__new-btn svg {
+  width: 13px;
+  height: 13px;
 }
 
 .file-tree__item {

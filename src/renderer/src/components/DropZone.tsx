@@ -2,7 +2,7 @@ import React from 'react'
 import { useAppState } from '../state/AppContext'
 
 export default function DropZone(): React.JSX.Element {
-  const { openResult, error } = useAppState()
+  const { openResult, createNewFile, error } = useAppState()
 
   async function handleOpenFile(): Promise<void> {
     const result = await window.api.openFileDialog()
@@ -25,6 +25,9 @@ export default function DropZone(): React.JSX.Element {
           </button>
           <button className="btn" onClick={handleOpenFolder}>
             Open Folder…
+          </button>
+          <button className="btn" onClick={() => void createNewFile()}>
+            New File…
           </button>
         </div>
         {error && <p className="drop-zone__error">{error}</p>}

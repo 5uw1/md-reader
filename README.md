@@ -7,7 +7,7 @@ A desktop Markdown reader and editor, built with Electron, React, and TypeScript
 
 ## Download
 
-[**⬇ Download the latest portable build**](https://github.com/5uw1/md-reader/releases/latest) — a single `.exe`, no installer, no admin rights needed. Just download and run it. It's unsigned, so Windows SmartScreen may warn on first launch ("More info" → "Run anyway").
+[**⬇ Download the latest portable build**](https://github.com/5uw1/md-reader/releases/latest) — a `.zip`, no installer, no admin rights needed. Extract it and run `MD Reader.exe` from inside the extracted folder. It's unsigned, so Windows SmartScreen may warn on first launch ("More info" → "Run anyway").
 
 ## Features
 
@@ -51,12 +51,12 @@ This launches the app in development mode with hot reload.
 ```bash
 npm run typecheck   # type-check the whole project
 npm run build        # production build
-npm run build:win    # build + package a portable Windows .exe (electron-builder)
+npm run build:win    # build + package a portable Windows zip (electron-builder)
 ```
 
 ## Releasing
 
-Pushing a tag matching `v*` builds the portable Windows `.exe` and publishes it to the [Releases page](https://github.com/5uw1/md-reader/releases) automatically:
+Pushing a tag matching `v*` builds the portable Windows zip and publishes it to the [Releases page](https://github.com/5uw1/md-reader/releases) automatically:
 
 ```bash
 git tag v0.2.0

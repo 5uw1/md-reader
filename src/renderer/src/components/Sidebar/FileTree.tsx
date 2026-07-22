@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { FileTreeNode } from '../../../../shared/types'
 import { useAppState } from '../../state/AppContext'
+import { NewFileIcon } from '../icons'
 
 function TreeNode({ node, depth }: { node: FileTreeNode; depth: number }): React.JSX.Element {
   const { currentFilePath, selectFile } = useAppState()
@@ -38,12 +39,22 @@ function TreeNode({ node, depth }: { node: FileTreeNode; depth: number }): React
 }
 
 export default function FileTree(): React.JSX.Element | null {
-  const { tree } = useAppState()
+  const { tree, createNewFile } = useAppState()
   if (!tree) return null
 
   return (
     <nav className="file-tree" aria-label="Markdown files">
-      <div className="file-tree__root-label">{tree.name}</div>
+      <div className="file-tree__root-row">
+        <div className="file-tree__root-label">{tree.name}</div>
+        <button
+          className="file-tree__new-btn"
+          aria-label="New file"
+          title="New file in this folder"
+          onClick={() => void createNewFile()}
+        >
+          <NewFileIcon />
+        </button>
+      </div>
       {tree.children?.map((child) => <TreeNode key={child.path} node={child} depth={0} />)}
     </nav>
   )

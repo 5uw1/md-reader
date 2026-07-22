@@ -74,6 +74,22 @@ async function openFolderDialog() {
   return resolveOpenPathAndRecord(result.filePaths[0])
 }
 
+async function newFileDialog(defaultDir?: string): Promise<string | null> {
+  if (!mainWindow) return null
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'New Markdown File',
+    defaultPath: join(defaultDir ?? app.getPath('documents'), 'Untitled.md'),
+    filters: [{ name: 'Markdown', extensions: ['md'] }]
+  })
+  if (result.canceled || !result.filePath) return null
+
+  const filePath = /\.[^/\\]+$/.test(result.filePath) ? result.filePath : `${result.filePath}.md`
+  await fs.writeFile(filePath, '', 'utf-8')
+  recentEntries = await addRecent(filePath, 'file')
+  buildMenu()
+  return filePath
+}
+
 async function openRecentEntry(entry: RecentEntry): Promise<void> {
   const result = await resolveOpenPathAndRecord(entry.path)
   if (!result) {
@@ -114,6 +130,10 @@ function setViewModeFromMenu(mode: ViewMode): void {
 
 function requestSaveFromMenu(): void {
   mainWindow?.webContents.send('menu:save-request')
+}
+
+function requestNewFileFromMenu(): void {
+  mainWindow?.webContents.send('menu:new-file-request')
 }
 
 async function exportCurrentToPdf(): Promise<void> {
@@ -158,6 +178,8 @@ function buildMenu(): void {
     {
       label: 'File',
       submenu: [
+        { label: 'New File…', accelerator: 'CmdOrCtrl+N', click: () => requestNewFileFromMenu() },
+        { type: 'separator' },
         { label: 'Open File…', accelerator: 'CmdOrCtrl+O', click: () => openFileDialogFromMenu() },
         { label: 'Open Folder…', accelerator: 'CmdOrCtrl+Shift+O', click: () => openFolderDialogFromMenu() },
         { label: 'Open Recent', submenu: recentSubmenu },
@@ -261,6 +283,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('fs:resolveOpenPath', (_event, targetPath: string) => resolveOpenPathAndRecord(targetPath))
   ipcMain.handle('dialog:openFile', () => openFileDialog())
   ipcMain.handle('dialog:openFolder', () => openFolderDialog())
+  ipcMain.handle('dialog:newFile', (_event, defaultDir?: string) => newFileDialog(defaultDir))
   ipcMain.handle('shell:openExternal', (_event, url: string) => shell.openExternal(url))
   ipcMain.on('theme:report', (_event, theme: ThemeMode) => {
     currentTheme = theme

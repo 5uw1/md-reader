@@ -14,7 +14,8 @@ import MarkdownViewer from './components/Viewer/MarkdownViewer'
 import EditorPane from './components/Viewer/EditorPane'
 
 function Shell(): React.JSX.Element {
-  const { mode, openResult, viewMode, showToc, showSearch, headings, setActiveHeadingId } = useAppState()
+  const { mode, openResult, createNewFile, viewMode, showToc, showSearch, headings, setActiveHeadingId } =
+    useAppState()
   const { isDraggingOver } = useFileDrop()
   // State (not plain refs) so the scroll-sync effect re-attaches if either
   // node is ever replaced, e.g. EditorPane remounting.
@@ -41,6 +42,12 @@ function Shell(): React.JSX.Element {
       void openResult(result)
     })
   }, [openResult])
+
+  useEffect(() => {
+    return window.api.onNewFileRequested(() => {
+      void createNewFile()
+    })
+  }, [createNewFile])
 
   useSplitScrollSync(previewEl, editorEl, viewMode === 'split')
   useActiveHeading(previewEl, headings, viewMode !== 'edit', setActiveHeadingId)

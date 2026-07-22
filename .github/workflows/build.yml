@@ -59,9 +59,9 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           npm version --no-git-tag-version "${CURRENT_VERSION}-dev.${{ github.run_number }}"
 
-      # Tag pushes: build the portable .exe (electron-builder doesn't publish it —
+      # Tag pushes: build the portable zip (electron-builder doesn't publish it —
       # the release itself, with auto-generated notes, is created in the next step).
-      - name: Build portable exe
+      - name: Build portable zip
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           npx electron-vite build
@@ -69,7 +69,7 @@ jobs:
 
       # Create the GitHub Release with notes auto-generated from commits since the
       # last tag (GitHub's built-in "What's Changed" + full-changelog link — no
-      # changelog file to maintain), and attach the portable .exe to it.
+      # changelog file to maintain), and attach the portable zip to it.
       - name: Create release with auto-generated notes
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -80,20 +80,20 @@ jobs:
           if [ "$RELEASE_TYPE" = "prerelease" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
-          gh release create "$GITHUB_REF_NAME" dist/*.exe \
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
             $PRERELEASE_FLAG
 
-      # Push to main / manual runs: build and upload the portable .exe as a workflow
+      # Push to main / manual runs: build and upload the portable zip as a workflow
       # artifact only — never published as a public release.
       - name: Build (dev build)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: npm run build:win
 
-      - name: Upload portable exe artifact
+      - name: Upload portable zip artifact
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4
         with:
           name: md-reader-windows-portable
-          path: dist/*.exe
+          path: dist/*.zip

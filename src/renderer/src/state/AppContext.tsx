@@ -168,6 +168,7 @@ interface AppContextValue extends AppState {
   isDirty: boolean
   openPath: (targetPath: string) => Promise<void>
   openResult: (result: OpenPathResult) => Promise<void>
+  createNewFile: () => Promise<void>
   selectFile: (filePath: string) => Promise<void>
   setContent: (content: string) => void
   setViewMode: (mode: ViewMode) => void
@@ -245,6 +246,24 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     },
     [openResult]
   )
+
+  const createNewFile = useCallback(async () => {
+    const s = stateRef.current
+    const defaultDir = s.mode === 'folder' ? s.rootPath : undefined
+    const newPath = await window.api.newFileDialog(defaultDir)
+    if (!newPath) return
+
+    const normalize = (p: string): string => p.replace(/\\/g, '/').toLowerCase()
+    const inCurrentFolder =
+      s.mode === 'folder' && !!s.rootPath && normalize(newPath).startsWith(`${normalize(s.rootPath)}/`)
+
+    if (inCurrentFolder && s.rootPath) {
+      const tree = await window.api.scanFolder(s.rootPath)
+      await openResult({ kind: 'folder', rootPath: s.rootPath, tree, defaultFilePath: newPath })
+    } else {
+      await openResult({ kind: 'file', rootPath: newPath, defaultFilePath: newPath })
+    }
+  }, [openResult])
 
   const setContent = useCallback((content: string) => dispatch({ type: 'SET_CONTENT', content }), [])
 
@@ -355,6 +374,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       isDirty,
       openPath,
       openResult,
+      createNewFile,
       selectFile,
       setContent,
       setViewMode,
@@ -374,6 +394,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       isDirty,
       openPath,
       openResult,
+      createNewFile,
       selectFile,
       setContent,
       setViewMode,

@@ -11,6 +11,8 @@ const api = {
     ipcRenderer.invoke('fs:resolveOpenPath', targetPath),
   openFileDialog: (): Promise<OpenPathResult | null> => ipcRenderer.invoke('dialog:openFile'),
   openFolderDialog: (): Promise<OpenPathResult | null> => ipcRenderer.invoke('dialog:openFolder'),
+  newFileDialog: (defaultDir?: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:newFile', defaultDir),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url),
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   onMenuOpen: (callback: (result: OpenPathResult) => void): (() => void) => {
@@ -36,6 +38,11 @@ const api = {
     const listener = (): void => callback()
     ipcRenderer.on('menu:save-request', listener)
     return () => ipcRenderer.removeListener('menu:save-request', listener)
+  },
+  onNewFileRequested: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('menu:new-file-request', listener)
+    return () => ipcRenderer.removeListener('menu:new-file-request', listener)
   }
 }
 
